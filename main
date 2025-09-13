@@ -1,0 +1,498 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { ShoppingCart, User, LogOut, Plus, Minus, X } from "lucide-react";
+
+// Types
+type User = {
+  id: string;
+  username: string;
+  email: string;
+};
+
+type Product = {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  category: string;
+  image?: string;
+};
+
+type CartItem = {
+  product: Product;
+  quantity: number;
+};
+
+// Mock data
+const mockProducts: Product[] = [
+  { id: "1", name: "Wireless Headphones", description: "Noise-cancelling Bluetooth headphones", price: 199.99, category: "Electronics" },
+  { id: "2", name: "Running Shoes", description: "Lightweight running shoes for everyday use", price: 89.99, category: "Footwear" },
+  { id: "3", name: "Coffee Maker", description: "Programmable coffee maker with timer", price: 79.99, category: "Home" },
+  { id: "4", name: "Smart Watch", description: "Fitness tracker with heart rate monitor", price: 149.99, category: "Electronics" },
+  { id: "5", name: "Backpack", description: "Water-resistant backpack with laptop compartment", price: 59.99, category: "Accessories" },
+  { id: "6", name: "Desk Lamp", description: "LED desk lamp with adjustable brightness", price: 39.99, category: "Home" },
+];
+
+const categories = ["All", "Electronics", "Footwear", "Home", "Accessories"];
+
+export default function EcommerceApp() {
+  // Authentication state
+  const [user, setUser] = useState<User | null>(null);
+  const [authMode, setAuthMode] = useState<"login" | "signup">("login");
+  const [authForm, setAuthForm] = useState({ username: "", email: "", password: "" });
+  const [authError, setAuthError] = useState<string | null>(null);
+  
+  // Product listing state
+  const [products, setProducts] = useState<Product[]>(mockProducts);
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>(mockProducts);
+  const [filters, setFilters] = useState({ category: "All", minPrice: "", maxPrice: "" });
+  
+  // Cart state
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  
+  // View state
+  const [currentView, setCurrentView] = useState<"listing" | "cart">("listing");
+
+  // Initialize from localStorage
+  useEffect(() => {
+    const savedUser = localStorage.getItem("user");
+    const savedCart = localStorage.getItem("cart");
+    
+    if (savedUser) {
+      setUser(JSON.parse(savedUser));
+    }
+    
+    if (savedCart) {
+      setCart(JSON.parse(savedCart));
+    }
+  }, []);
+
+  // Save cart to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem("cart", JSON.stringify(cart));
+  }, [cart]);
+
+  // Apply filters when they change
+  useEffect(() => {
+    let result = [...products];
+    
+    if (filters.category !== "All") {
+      result = result.filter(product => product.category === filters.category);
+    }
+    
+    if (filters.minPrice) {
+      const min = parseFloat(filters.minPrice);
+      result = result.filter(product => product.price >= min);
+    }
+    
+    if (filters.maxPrice) {
+      const max = parseFloat(filters.maxPrice);
+      result = result.filter(product => product.price <= max);
+    }
+    
+    setFilteredProducts(result);
+  }, [filters, products]);
+
+  // Auth handlers
+  const handleAuthSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError(null);
+    
+    if (authMode === "signup") {
+      // Simple validation
+      if (!authForm.username || !authForm.email || !authForm.password) {
+        setAuthError("All fields are required");
+        return;
+      }
+      
+      // Mock signup - in real app, this would be an API call
+      const newUser = {
+        id: Math.random().toString(36).substring(7),
+        username: authForm.username,
+        email: authForm.email
+      };
+      
+      setUser(newUser);
+      localStorage.setItem("user", JSON.stringify(newUser));
+      setAuthForm({ username: "", email: "", password: "" });
+    } else {
+      // Mock login
+      if (!authForm.email || !authForm.password) {
+        setAuthError("Email and password are required");
+        return;
+      }
+      
+      // Mock authentication - in real app, this would validate with backend
+      const mockUser = {
+        id: "1",
+        username: "JohnDoe",
+        email: authForm.email
+      };
+      
+      setUser(mockUser);
+      localStorage.setItem("user", JSON.stringify(mockUser));
+      setAuthForm({ username: "", email: "", password: "" });
+    }
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    localStorage.removeItem("user");
+  };
+
+  // Cart handlers
+  const addToCart = (product: Product) => {
+    setCart(prevCart => {
+      const existingItem = prevCart.find(item => item.product.id === product.id);
+      
+      if (existingItem) {
+        return prevCart.map(item => 
+          item.product.id === product.id 
+            ? { ...item, quantity: item.quantity + 1 } 
+            : item
+        );
+      } else {
+        return [...prevCart, { product, quantity: 1 }];
+      }
+    });
+  };
+
+  const removeFromCart = (productId: string) => {
+    setCart(prevCart => prevCart.filter(item => item.product.id !== productId));
+  };
+
+  const updateQuantity = (productId: string, quantity: number) => {
+    if (quantity < 1) return;
+    
+    setCart(prevCart => 
+      prevCart.map(item => 
+        item.product.id === productId 
+          ? { ...item, quantity } 
+          : item
+      )
+    );
+  };
+
+  const cartTotal = cart.reduce((total, item) => total + (item.product.price * item.quantity), 0);
+  const cartItemCount = cart.reduce((count, item) => count + item.quantity, 0);
+
+  // Filter handlers
+  const handleCategoryChange = (value: string) => {
+    setFilters(prev => ({ ...prev, category: value }));
+  };
+
+  const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFilters(prev => ({ ...prev, [name]: value }));
+  };
+
+  // Reset filters
+  const resetFilters = () => {
+    setFilters({ category: "All", minPrice: "", maxPrice: "" });
+  };
+
+  // If not authenticated, show auth forms
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-2xl font-bold text-center">
+              {authMode === "login" ? "Welcome Back" : "Create Account"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleAuthSubmit} className="space-y-4">
+              {authMode === "signup" && (
+                <div className="space-y-2">
+                  <Label htmlFor="username">Username</Label>
+                  <Input
+                    id="username"
+                    value={authForm.username}
+                    onChange={(e) => setAuthForm({...authForm, username: e.target.value})}
+                    placeholder="Enter your username"
+                  />
+                </div>
+              )}
+              
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={authForm.email}
+                  onChange={(e) => setAuthForm({...authForm, email: e.target.value})}
+                  placeholder="Enter your email"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={authForm.password}
+                  onChange={(e) => setAuthForm({...authForm, password: e.target.value})}
+                  placeholder="Enter your password"
+                />
+              </div>
+              
+              {authError && (
+                <div className="text-red-500 text-sm py-2">{authError}</div>
+              )}
+              
+              <Button type="submit" className="w-full">
+                {authMode === "login" ? "Sign In" : "Sign Up"}
+              </Button>
+            </form>
+          </CardContent>
+          <CardFooter className="flex flex-col">
+            <Button 
+              variant="link" 
+              onClick={() => setAuthMode(authMode === "login" ? "signup" : "login")}
+              className="text-sm"
+            >
+              {authMode === "login" 
+                ? "Don't have an account? Sign Up" 
+                : "Already have an account? Sign In"}
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
+
+  // Main app view when authenticated
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur">
+        <div className="container flex h-16 items-center justify-between px-4">
+          <div className="flex items-center gap-2">
+            <div className="bg-primary w-8 h-8 rounded-lg"></div>
+            <span className="text-xl font-bold">ShopEasy</span>
+          </div>
+          
+          <div className="flex items-center gap-4">
+            <Button 
+              variant="ghost" 
+              onClick={() => setCurrentView("listing")}
+              className={currentView === "listing" ? "bg-muted" : ""}
+            >
+              Products
+            </Button>
+            
+            <Button 
+              variant="ghost" 
+              onClick={() => {
+                setCurrentView("cart");
+                setIsCartOpen(true);
+              }}
+              className="relative"
+            >
+              <ShoppingCart className="h-5 w-5" />
+              <span className="sr-only">Cart</span>
+              {cartItemCount > 0 && (
+                <Badge className="absolute -top-2 -right-2 h-5 w-5 justify-center rounded-full p-0">
+                  {cartItemCount}
+                </Badge>
+              )}
+            </Button>
+            
+            <div className="flex items-center gap-2">
+              <div className="bg-gray-200 border-2 border-dashed rounded-xl w-8 h-8" />
+              <span className="hidden sm:inline">{user.username}</span>
+              <Button variant="ghost" size="icon" onClick={handleLogout}>
+                <LogOut className="h-4 w-4" />
+                <span className="sr-only">Logout</span>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="container py-6">
+        {currentView === "listing" ? (
+          <div className="space-y-6">
+            {/* Filters */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Filters</CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="space-y-2">
+                  <Label>Category</Label>
+                  <Select value={filters.category} onValueChange={handleCategoryChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map(category => (
+                        <SelectItem key={category} value={category}>
+                          {category}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="minPrice">Min Price</Label>
+                  <Input
+                    id="minPrice"
+                    name="minPrice"
+                    type="number"
+                    value={filters.minPrice}
+                    onChange={handlePriceChange}
+                    placeholder="0"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="maxPrice">Max Price</Label>
+                  <Input
+                    id="maxPrice"
+                    name="maxPrice"
+                    type="number"
+                    value={filters.maxPrice}
+                    onChange={handlePriceChange}
+                    placeholder="1000"
+                  />
+                </div>
+                
+                <div className="flex items-end">
+                  <Button onClick={resetFilters} variant="outline" className="w-full">
+                    Reset Filters
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+            
+            {/* Product Listing */}
+            <div>
+              <h2 className="text-2xl font-bold mb-4">Products</h2>
+              
+              {filteredProducts.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-muted-foreground">No products match your filters</p>
+                  <Button onClick={resetFilters} className="mt-4">Reset Filters</Button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredProducts.map(product => (
+                    <Card key={product.id} className="flex flex-col">
+                      <div className="flex-grow p-6">
+                        <div className="bg-gray-200 border-2 border-dashed rounded-xl w-full h-48 mb-4" />
+                        <div className="space-y-2">
+                          <div className="flex justify-between items-start">
+                            <h3 className="font-semibold text-lg">{product.name}</h3>
+                            <Badge variant="secondary">{product.category}</Badge>
+                          </div>
+                          <p className="text-muted-foreground text-sm">{product.description}</p>
+                          <p className="font-bold text-lg">${product.price.toFixed(2)}</p>
+                        </div>
+                      </div>
+                      <CardFooter>
+                        <Button 
+                          className="w-full" 
+                          onClick={() => addToCart(product)}
+                        >
+                          Add to Cart
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="max-w-4xl mx-auto">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-2xl">Your Cart</CardTitle>
+                <Button variant="outline" onClick={() => setCurrentView("listing")}>
+                  Continue Shopping
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {cart.length === 0 ? (
+                  <div className="text-center py-12">
+                    <ShoppingCart className="mx-auto h-12 w-12 text-muted-foreground" />
+                    <h3 className="mt-4 font-medium">Your cart is empty</h3>
+                    <p className="text-muted-foreground mb-6">Add some items to get started</p>
+                    <Button onClick={() => setCurrentView("listing")}>
+                      Browse Products
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    <div className="space-y-4">
+                      {cart.map(item => (
+                        <div key={item.product.id} className="flex items-center border-b pb-4">
+                          <div className="bg-gray-200 border-2 border-dashed rounded-xl w-16 h-16" />
+                          
+                          <div className="ml-4 flex-grow">
+                            <h3 className="font-medium">{item.product.name}</h3>
+                            <p className="text-muted-foreground text-sm">${item.product.price.toFixed(2)}</p>
+                          </div>
+                          
+                          <div className="flex items-center gap-2">
+                            <Button 
+                              size="icon" 
+                              variant="outline" 
+                              onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
+                            >
+                              <Minus className="h-4 w-4" />
+                            </Button>
+                            <span className="w-8 text-center">{item.quantity}</span>
+                            <Button 
+                              size="icon" 
+                              variant="outline" 
+                              onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          
+                          <div className="ml-4 w-20 text-right font-medium">
+                            ${(item.product.price * item.quantity).toFixed(2)}
+                          </div>
+                          
+                          <Button 
+                            size="icon" 
+                            variant="ghost" 
+                            className="ml-4"
+                            onClick={() => removeFromCart(item.product.id)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <div className="border-t pt-4">
+                      <div className="flex justify-between text-lg font-bold">
+                        <span>Total:</span>
+                        <span>${cartTotal.toFixed(2)}</span>
+                      </div>
+                      <Button className="w-full mt-6">Proceed to Checkout</Button>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
